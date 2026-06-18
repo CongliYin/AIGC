@@ -288,15 +288,15 @@ export const doubao = {
     if (inputMode === "firstFrame" || inputMode === "firstLastFrame") {
       const firstFrameUrl = opts.firstFrameUrl ?? opts.imageUrl;
       if (!firstFrameUrl) throw new Error("Seedance 图生视频缺少首帧图 URL");
-      content.push({ type: "image_url", image_url: { url: firstFrameUrl } });
+      content.push(seedanceImageContent(firstFrameUrl, "first_frame"));
       if (inputMode === "firstLastFrame") {
         if (!opts.lastFrameUrl) throw new Error("Seedance 首尾帧模式缺少尾帧图 URL");
-        content.push({ type: "image_url", image_url: { url: opts.lastFrameUrl } });
+        content.push(seedanceImageContent(opts.lastFrameUrl, "last_frame"));
       }
     }
 
     for (const url of opts.referenceImageUrls ?? []) {
-      content.push({ type: "image_url", image_url: { url } });
+      content.push(seedanceImageContent(url, "reference_image"));
     }
     for (const url of opts.referenceVideoUrls ?? []) {
       content.push({ type: "video_url", video_url: { url } });
@@ -342,6 +342,10 @@ export const doubao = {
     };
   },
 };
+
+function seedanceImageContent(url: string, role: "first_frame" | "last_frame" | "reference_image") {
+  return { type: "image_url", role, image_url: { url } };
+}
 
 function buildSeedanceMaterialPrompt(opts: VideoOptions): string {
   const imageCount = opts.referenceImageUrls?.filter(Boolean).length ?? 0;
