@@ -612,7 +612,7 @@ export const MODELS: ModelDef[] = [
     modelId: "doubao-seedance-2-0-260128",
     inputModes: ["text", "firstFrame", "firstLastFrame", "reference"],
     durationOptions: [5, 10],
-    aspectRatios: ["16:9", "9:16"],
+    aspectRatios: ["16:9", "9:16", "4:3", "3:4"],
     maxReferenceImages: 9,
     maxReferenceVideos: 3,
     maxReferenceAudios: 3,
