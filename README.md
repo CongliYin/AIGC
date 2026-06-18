@@ -1,58 +1,115 @@
-# zzz-media — AI 图像 / 视频生成工作台
+# AIGC Media Generator
 
-Next.js（App Router）单仓库，前端 + serverless API 路由，可直接部署到 Vercel。
-所有模型请求都走智增增网关；key 只放在服务端环境变量。
+一个基于 Next.js 的网页端 AIGC 生成工具，支持 GPT 与 Seed 系列模型生成图像和视频。前端负责选择模型、填写提示词和预览结果；后端 API 路由负责调用模型、上传素材、轮询视频任务状态，并保护服务端密钥不暴露到浏览器。
 
-## 目录
-```
-src/lib/zzz.ts                     核心：配置 / 类型 / 适配器 / 模型注册表 / 统一分发
-src/app/api/models/route.ts        GET  返回可选模型（无 key）
-src/app/api/image/route.ts         POST 同步生成图片
-src/app/api/video/create/route.ts  POST 提交视频任务 → 返回 token
-src/app/api/video/status/route.ts  GET  轮询视频任务状态
-src/app/api/video/file/route.ts    GET  Veo 专属：后端代理下载视频（注入 key）
+## 功能
+
+- 图像生成：支持 Seedream 和 GPT Image 2。
+- 视频生成：支持 Seedance。
+- 视频输入：支持文生视频、首帧图、首帧 + 尾帧、多参考素材。
+- 素材上传：支持图片、视频、音频上传到 Vercel Blob，用于视频首帧或参考素材。
+- 结果预览：图片直接展示；视频任务提交后自动轮询，完成后播放。
+- 部署友好：Next.js App Router 单仓库，可直接部署到 Vercel。
+
+## 当前模型
+
+| 类型 | 前端模型名 | 模型 ID |
+|---|---|---|
+| 图像 | 豆包 Seedream（图） | `doubao-seedream-5-0-lite-260128` |
+| 图像 | GPT Image 2（图） | `gpt-image-2` |
+| 视频 | 豆包 Seedance（视频） | `doubao-seedance-2-0-260128` |
+
+图片尺寸会按模型自动切换：
+
+- Seedream: `2048x2048`, `2560x1440`, `1440x2560`
+- GPT Image 2: `1024x1024`, `1536x1024`, `1024x1536`
+
+Seedance 视频当前支持：
+
+- 输入模式：文生视频、首帧图、首帧 + 尾帧、参考素材
+- 时长：`5` 秒、`10` 秒
+- 比例：`16:9`、`9:16`
+- 参考素材上限：9 张图、3 段视频、3 段音频
+
+## 项目结构
+
+```text
+src/lib/zzz.ts                     模型配置、适配器、统一分发
+src/app/api/models/route.ts        获取前端可选模型
+src/app/api/image/route.ts         图像生成
+src/app/api/video/create/route.ts  创建视频任务
+src/app/api/video/status/route.ts  轮询视频任务状态
+src/app/api/upload/image/route.ts  上传图片素材
+src/app/api/upload/media/route.ts  上传图片/视频/音频素材
 src/app/page.tsx                   前端工作台
+src/app/globals.css                页面样式
 ```
 
-## 当前前端暴露的模型
-- 图像：豆包 Seedream、GPT Image 2
-- 视频：豆包 Seedance
+## 环境变量
 
-## 端点映射（来自智增增文档，均挂在 https://api.zhizengzeng.com 下）
-| 厂商 | 能力 | 方法 + 路径 | 鉴权 | 模式 |
-|---|---|---|---|---|
-| Veo (google) | 视频 | `POST /google/v1beta/models/{model}:predictLongRunning` | `?key=` | 异步 |
-| Veo | 轮询 | `GET /google/v1beta/models/{model}/operations/{id}` | `?key=` | — |
-| Veo | 下载 | `GET /google/v1beta/files/{fileId}:download?alt=media` | `?key=` | — |
-| 豆包 (bytedance) | 图片 | `POST /bytedance/api/v3/images/generations` | Bearer | 同步 |
-| 豆包 | 视频 | `POST /bytedance/api/v3/contents/generations/tasks` | Bearer | 异步 |
-| 豆包 | 轮询 | `GET /bytedance/api/v3/contents/generations/tasks/{id}` | Bearer | — |
-| 千问 (alibaba) | 视频 | `POST /alibaba/api/v1/services/aigc/video-generation/video-synthesis` | Bearer + `X-DashScope-Async: enable` | 异步 |
-| 千问 | 轮询 | `GET /alibaba/api/v1/tasks/{task_id}` | Bearer | — |
-| xAI (xai) | 图片 | `POST /xai/v1/images/generations` | Bearer | 同步 |
-| xAI | 视频 | `POST /xai/v1/videos/generations` | Bearer | 异步 |
-| xAI | 轮询 | `GET /xai/v1/videos/{request_id}` | Bearer | — |
-| OpenAI 兼容通道 | 图片 | `POST /openai/v1/images/generations` | Bearer | 同步，通常返回 `b64_json` |
+复制示例文件：
 
-## ⚠️ 交给 codex 前请核实（智增增文档只给了端点，请求体指向各家官方文档）
-1. `src/lib/zzz.ts` 里 `MODELS` 的每个 `modelId`（真实模型名）—— 对照各家官方控制台。
-2. 各家请求体字段细节：火山 content/参数、DashScope `parameters.size`/`duration`、
-   xAI 视频请求体与状态字段、Veo `parameters`（personGeneration 在欧盟等地区受限）。
-3. 各家轮询响应里取视频地址的字段名（已按官方格式写并做了容错，建议先打 `raw` 看真实结构）。
-4. Veo 完成后的 fileId 解析（`extractVeoFileId`）—— 不同 Veo 版本结构略有差异。
+```bash
+cp .env.example .env.local
+```
+
+配置：
+
+```bash
+ZZZ_API_KEY=your_model_api_key_here
+ZZZ_BASE_URL=https://your-model-api-base-url.example
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_read_write_token_here
+```
+
+不要提交 `.env.local`。密钥只应配置在本地 `.env.local` 或 Vercel Environment Variables。
 
 ## 本地运行
+
 ```bash
-npm i        # 需要一个标准 Next.js 14+ 项目（codex 可补 package.json / tsconfig / next.config）
-cp .env.example .env.local
-# 填入 ZZZ_API_KEY
+npm install
 npm run dev
 ```
 
-## 部署到 Vercel
-1. 代码推到 GitHub。
-2. Vercel 连接该仓库，自动部署。
-3. 在 Vercel 项目 Settings → Environment Variables 配置 `ZZZ_API_KEY`。
-4. 全程无需 GPU；视频走「提交 + 轮询」异步模式，不会触发函数超时。
-   Veo 视频通过后端代理下载会占出口带宽，个人使用足够（Hobby 档每月 100GB）。
+默认访问：
+
+```text
+http://localhost:3000
 ```
+
+如果你用的是其它端口，例如：
+
+```bash
+npm run dev -- -p 3100
+```
+
+则访问：
+
+```text
+http://localhost:3100
+```
+
+## 部署到 Vercel
+
+1. 将代码推送到 GitHub。
+2. 在 Vercel 新建项目并导入仓库。
+3. Framework Preset 选择 `Next.js`。
+4. 在 Vercel 的 Environment Variables 中配置：
+   - `ZZZ_API_KEY`
+   - `ZZZ_BASE_URL`
+   - `BLOB_READ_WRITE_TOKEN`
+5. 点击 Deploy。
+
+部署完成后，可以先访问：
+
+```text
+https://你的域名.vercel.app/api/models
+```
+
+正常情况下会返回图像模型和视频模型列表。然后再打开首页测试图像生成、视频生成和素材上传。
+
+## 注意事项
+
+- 视频生成是异步任务：创建任务后前端会轮询状态，不会在一个请求里等待视频完成。
+- 上传首帧图或参考素材需要配置 `BLOB_READ_WRITE_TOKEN`。
+- 修改模型 ID 后需要重启本地开发服务或重新部署 Vercel。
+- 生产环境不要在浏览器、日志或接口响应里暴露任何服务端密钥。
