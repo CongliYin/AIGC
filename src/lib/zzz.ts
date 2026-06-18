@@ -126,6 +126,8 @@ export type TaskStatus = "pending" | "running" | "succeeded" | "failed";
 export interface ImageOptions {
   prompt: string;
   size?: string; // 例如 "1024x1024"
+  quality?: "low" | "medium" | "high";
+  outputFormat?: "jpeg" | "png" | "webp";
   imageBase64?: string; // 图生图时的参考图（data URL 或纯 base64）
 }
 
@@ -445,13 +447,13 @@ export const openai = {
       body: JSON.stringify({
         model,
         prompt: opts.prompt,
-        size: "1024x1024",
-        quality: "low",
-        output_format: "jpeg",
+        size: opts.size ?? "1024x1024",
+        quality: opts.quality ?? "low",
+        output_format: opts.outputFormat ?? "jpeg",
       }),
     });
     const result = normalizeImageResult(json);
-    return result.base64 ? { ...result, mimeType: "image/jpeg" } : result;
+    return result.base64 ? { ...result, mimeType: `image/${opts.outputFormat ?? "jpeg"}` } : result;
   },
 };
 
@@ -573,6 +575,8 @@ export interface ModelDef {
   durationOptions?: number[];
   aspectRatios?: string[];
   sizeOptions?: string[];
+  qualityOptions?: Array<NonNullable<ImageOptions["quality"]>>;
+  outputFormatOptions?: Array<NonNullable<ImageOptions["outputFormat"]>>;
   maxReferenceImages?: number;
   maxReferenceVideos?: number;
   maxReferenceAudios?: number;
@@ -594,7 +598,9 @@ export const MODELS: ModelDef[] = [
     vendor: "openai",
     kind: "image",
     modelId: "gpt-image-2",
-    sizeOptions: ["1024x1024"],
+    sizeOptions: ["1024x1024", "1536x1024", "1024x1536"],
+    qualityOptions: ["low", "medium", "high"],
+    outputFormatOptions: ["jpeg", "png", "webp"],
   },
 
   // —— 视频 ——

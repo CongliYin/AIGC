@@ -5,13 +5,13 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
-    const { modelId, prompt, size, imageBase64 } = await req.json();
+    const { modelId, prompt, size, quality, outputFormat, imageBase64 } = await req.json();
 
     if (!modelId || !prompt) {
       return NextResponse.json({ error: "缺少 modelId 或 prompt" }, { status: 400 });
     }
 
-    const result = await generateImage(modelId, { prompt, size, imageBase64 });
+    const result = await generateImage(modelId, { prompt, size, quality, outputFormat, imageBase64 });
     if (!result.url && !result.base64) {
       return NextResponse.json(
         {

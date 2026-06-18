@@ -8,6 +8,8 @@ type ModelOption = {
   id: string;
   label: string;
   sizeOptions?: string[];
+  qualityOptions?: ImageQuality[];
+  outputFormatOptions?: ImageOutputFormat[];
   inputModes?: VideoInputMode[];
   durationOptions?: number[];
   aspectRatios?: string[];
@@ -17,6 +19,8 @@ type ModelOption = {
 };
 type ModelLists = { image: ModelOption[]; video: ModelOption[] };
 type StatusTone = "idle" | "working" | "success" | "error";
+type ImageQuality = "low" | "medium" | "high";
+type ImageOutputFormat = "jpeg" | "png" | "webp";
 
 type ImageResult = {
   url?: string;
@@ -39,7 +43,19 @@ type UploadResult = {
 
 const EMPTY_MODELS: ModelLists = { image: [], video: [] };
 const DEFAULT_IMAGE_SIZE_OPTIONS = ["2048x2048", "2560x1440", "1440x2560"];
+const EMPTY_IMAGE_QUALITY_OPTIONS: ImageQuality[] = [];
+const EMPTY_IMAGE_OUTPUT_FORMAT_OPTIONS: ImageOutputFormat[] = [];
 const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const QUALITY_LABELS: Record<ImageQuality, string> = {
+  low: "低",
+  medium: "中",
+  high: "高",
+};
+const FORMAT_LABELS: Record<ImageOutputFormat, string> = {
+  jpeg: "JPEG",
+  png: "PNG",
+  webp: "WebP",
+};
 const INPUT_MODE_LABELS: Record<VideoInputMode, string> = {
   text: "文生视频",
   firstFrame: "首帧图生视频",
@@ -98,6 +114,8 @@ export default function Home() {
   const [videoModel, setVideoModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [imageSize, setImageSize] = useState("2048x2048");
+  const [imageQuality, setImageQuality] = useState<ImageQuality>("low");
+  const [imageOutputFormat, setImageOutputFormat] = useState<ImageOutputFormat>("jpeg");
   const [inputMode, setInputMode] = useState<VideoInputMode>("text");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [durationSeconds, setDurationSeconds] = useState(5);
@@ -135,6 +153,8 @@ export default function Home() {
   const imageSizeOptions = selectedImageModel?.sizeOptions?.length
     ? selectedImageModel.sizeOptions
     : DEFAULT_IMAGE_SIZE_OPTIONS;
+  const imageQualityOptions = selectedImageModel?.qualityOptions ?? EMPTY_IMAGE_QUALITY_OPTIONS;
+  const imageOutputFormatOptions = selectedImageModel?.outputFormatOptions ?? EMPTY_IMAGE_OUTPUT_FORMAT_OPTIONS;
   const inputModes: VideoInputMode[] = selectedVideoModel?.inputModes?.length ? selectedVideoModel.inputModes : ["text"];
   const durationOptions = selectedVideoModel?.durationOptions?.length
     ? selectedVideoModel.durationOptions
@@ -170,7 +190,13 @@ export default function Home() {
     if (!imageSizeOptions.includes(imageSize)) {
       setImageSize(imageSizeOptions[0] ?? "1024x1024");
     }
-  }, [imageSize, imageSizeOptions]);
+    if (imageQualityOptions.length && !imageQualityOptions.includes(imageQuality)) {
+      setImageQuality(imageQualityOptions[0] ?? "low");
+    }
+    if (imageOutputFormatOptions.length && !imageOutputFormatOptions.includes(imageOutputFormat)) {
+      setImageOutputFormat(imageOutputFormatOptions[0] ?? "jpeg");
+    }
+  }, [imageOutputFormat, imageOutputFormatOptions, imageQuality, imageQualityOptions, imageSize, imageSizeOptions]);
 
   useEffect(() => {
     if (!inputModes.includes(inputMode)) {
@@ -386,7 +412,13 @@ export default function Home() {
         const response = await fetch("/api/image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ modelId: model, prompt: prompt.trim(), size: imageSize }),
+          body: JSON.stringify({
+            modelId: model,
+            prompt: prompt.trim(),
+            size: imageSize,
+            quality: imageQualityOptions.length ? imageQuality : undefined,
+            outputFormat: imageOutputFormatOptions.length ? imageOutputFormat : undefined,
+          }),
           signal: controller.signal,
         });
         const data = await readJson<ImageResult>(response);
@@ -513,16 +545,48 @@ export default function Home() {
           </label>
 
           {kind === "image" ? (
-            <label className="field">
-              <span>画幅</span>
-              <select value={imageSize} onChange={(event) => setImageSize(event.target.value)}>
-                {imageSizeOptions.map((size) => (
-                  <option value={size} key={size}>
-                    {sizeLabel(size)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="video-grid">
+              <label className="field">
+                <span>画幅</span>
+                <select value={imageSize} onChange={(event) => setImageSize(event.target.value)}>
+                  {imageSizeOptions.map((size) => (
+                    <option value={size} key={size}>
+                      {sizeLabel(size)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {imageQualityOptions.length ? (
+                <label className="field">
+                  <span>质量</span>
+                  <select
+                    value={imageQuality}
+                    onChange={(event) => setImageQuality(event.target.value as ImageQuality)}
+                  >
+                    {imageQualityOptions.map((quality) => (
+                      <option value={quality} key={quality}>
+                        {QUALITY_LABELS[quality]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {imageOutputFormatOptions.length ? (
+                <label className="field">
+                  <span>格式</span>
+                  <select
+                    value={imageOutputFormat}
+                    onChange={(event) => setImageOutputFormat(event.target.value as ImageOutputFormat)}
+                  >
+                    {imageOutputFormatOptions.map((format) => (
+                      <option value={format} key={format}>
+                        {FORMAT_LABELS[format]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
           ) : (
             <div className="video-grid">
               <label className="field video-wide">
