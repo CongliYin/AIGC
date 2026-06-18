@@ -21,6 +21,7 @@ type StatusTone = "idle" | "working" | "success" | "error";
 type ImageResult = {
   url?: string;
   base64?: string;
+  mimeType?: string;
   error?: string;
 };
 
@@ -389,7 +390,7 @@ export default function Home() {
           signal: controller.signal,
         });
         const data = await readJson<ImageResult>(response);
-        const nextUrl = data.url || (data.base64 ? `data:image/png;base64,${data.base64}` : "");
+        const nextUrl = data.url || (data.base64 ? `data:${data.mimeType ?? "image/png"};base64,${data.base64}` : "");
         if (!nextUrl) throw new Error("模型未返回图片");
         setResultUrl(nextUrl);
         setResultKind("image");

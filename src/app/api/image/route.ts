@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ url: result.url, base64: result.base64 });
+    return NextResponse.json({ url: result.url, base64: result.base64, mimeType: result.mimeType });
   } catch (e) {
     const message = e instanceof Error ? e.message : "图片生成失败";
     return NextResponse.json({ error: message }, { status: 500 });

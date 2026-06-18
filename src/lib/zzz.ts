@@ -132,6 +132,7 @@ export interface ImageOptions {
 export interface ImageResult {
   url?: string; // 直接可访问的图片 URL（豆包/xAI 通常返回）
   base64?: string; // 或 base64
+  mimeType?: string;
   debugPaths?: string[]; // 解析失败时返回字段路径摘要，避免暴露完整响应
 }
 
@@ -444,10 +445,13 @@ export const openai = {
       body: JSON.stringify({
         model,
         prompt: opts.prompt,
-        size: opts.size ?? "1024x1024",
+        size: "1024x1024",
+        quality: "low",
+        output_format: "jpeg",
       }),
     });
-    return normalizeImageResult(json);
+    const result = normalizeImageResult(json);
+    return result.base64 ? { ...result, mimeType: "image/jpeg" } : result;
   },
 };
 
@@ -590,7 +594,7 @@ export const MODELS: ModelDef[] = [
     vendor: "openai",
     kind: "image",
     modelId: "gpt-image-2",
-    sizeOptions: ["1024x1024", "1536x1024", "1024x1536"],
+    sizeOptions: ["1024x1024"],
   },
 
   // —— 视频 ——
