@@ -14,7 +14,8 @@
 
 // ============================ 配置 ============================
 
-const BASE_URL = process.env.ZZZ_BASE_URL ?? "https://api.zhizengzeng.com";
+const BASE_URL = normalizeBaseUrl(process.env.ZZZ_BASE_URL ?? "https://api.zhizengzeng.com");
+const OPENAI_COMPAT_BASE_URL = openaiCompatBaseUrl(BASE_URL);
 
 function apiKey(): string {
   const key = process.env.ZZZ_API_KEY;
@@ -44,6 +45,37 @@ async function bearerFetchRaw(path: string, init: RequestInit & { headers?: Reco
   const text = await res.text();
   const json = text ? safeJson(text) : {};
   return { res, text, json };
+}
+
+async function openaiCompatFetch(path: string, init: RequestInit & { headers?: Record<string, string> } = {}) {
+  const res = await fetch(`${OPENAI_COMPAT_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey()}`,
+      ...(init.headers ?? {}),
+    },
+  });
+  const text = await res.text();
+  const json = text ? safeJson(text) : {};
+  if (!res.ok) {
+    throw new Error(`网关返回 ${res.status}: ${(apiErrorMessage(json) || text).slice(0, 500)}`);
+  }
+  throwIfApiError(json);
+  return json;
+}
+
+function openaiCompatBaseUrl(baseUrl: string) {
+  const normalized = baseUrl.replace(/\/+$/, "");
+  return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
+}
+
+function normalizeBaseUrl(baseUrl: string) {
+  const normalized = baseUrl.replace(/\/+$/, "");
+  if (normalized === "http://api.zhizengzeng.com") {
+    return "https://api.zhizengzeng.com";
+  }
+  return normalized;
 }
 
 // google 通道：key 放在 query 上
@@ -407,7 +439,7 @@ export const xai = {
 
 export const openai = {
   async generateImage(model: string, opts: ImageOptions): Promise<ImageResult> {
-    const json: any = await bearerFetch("/openai/v1/images/generations", {
+    const json: any = await openaiCompatFetch("/images/generations", {
       method: "POST",
       body: JSON.stringify({
         model,
