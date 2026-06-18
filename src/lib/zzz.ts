@@ -445,7 +445,6 @@ export const openai = {
         model,
         prompt: opts.prompt,
         size: opts.size ?? "1024x1024",
-        quality: "auto",
       }),
     });
     return normalizeImageResult(json);
