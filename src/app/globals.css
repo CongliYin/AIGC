@@ -313,6 +313,18 @@ h1 {
   gap: 8px;
 }
 
+.reference-url-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 0.26fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.reference-url-row .secondary {
+  min-width: 72px;
+  padding-inline: 14px;
+}
+
 .material-list button {
   min-height: 30px;
   border: 1px solid var(--line-strong);
@@ -526,7 +538,8 @@ h1 {
   }
 
   .video-grid,
-  .result-meta {
+  .result-meta,
+  .reference-url-row {
     grid-template-columns: 1fr;
   }
 

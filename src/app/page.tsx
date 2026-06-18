@@ -21,6 +21,7 @@ type ModelLists = { image: ModelOption[]; video: ModelOption[] };
 type StatusTone = "idle" | "working" | "success" | "error";
 type ImageQuality = "low" | "medium" | "high";
 type ImageOutputFormat = "jpeg" | "png" | "webp";
+type ReferenceUrlType = "image" | "video" | "audio";
 
 type ImageResult = {
   url?: string;
@@ -55,6 +56,11 @@ const FORMAT_LABELS: Record<ImageOutputFormat, string> = {
   jpeg: "JPEG",
   png: "PNG",
   webp: "WebP",
+};
+const REFERENCE_TYPE_LABELS: Record<ReferenceUrlType, string> = {
+  image: "图像",
+  video: "视频",
+  audio: "音频",
 };
 const INPUT_MODE_LABELS: Record<VideoInputMode, string> = {
   text: "文生视频",
@@ -107,6 +113,15 @@ function sizeLabel(size: string) {
   return `9:16 · ${size}`;
 }
 
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export default function Home() {
   const [models, setModels] = useState<ModelLists>(EMPTY_MODELS);
   const [kind, setKind] = useState<MediaKind>("image");
@@ -125,6 +140,8 @@ export default function Home() {
   const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
   const [referenceVideoUrls, setReferenceVideoUrls] = useState<string[]>([]);
   const [referenceAudioUrls, setReferenceAudioUrls] = useState<string[]>([]);
+  const [referenceUrl, setReferenceUrl] = useState("");
+  const [referenceUrlType, setReferenceUrlType] = useState<ReferenceUrlType>("image");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -391,6 +408,43 @@ export default function Home() {
     if (kind === "image") setReferenceImageUrls((items) => items.filter((_, i) => i !== index));
     if (kind === "video") setReferenceVideoUrls((items) => items.filter((_, i) => i !== index));
     if (kind === "audio") setReferenceAudioUrls((items) => items.filter((_, i) => i !== index));
+  }
+
+  function addReferenceUrl() {
+    const url = referenceUrl.trim();
+    if (!url) return;
+    if (!isHttpUrl(url)) {
+      setStatusTone("error");
+      setStatus("参考素材 URL 必须以 http:// 或 https:// 开头");
+      return;
+    }
+
+    if (referenceUrlType === "image") {
+      if (referenceImageUrls.length >= (selectedVideoModel?.maxReferenceImages ?? 0)) {
+        setStatusTone("error");
+        setStatus("参考图数量已达当前模型上限");
+        return;
+      }
+      setReferenceImageUrls((items) => [...items, url]);
+    } else if (referenceUrlType === "video") {
+      if (referenceVideoUrls.length >= (selectedVideoModel?.maxReferenceVideos ?? 0)) {
+        setStatusTone("error");
+        setStatus("参考视频数量已达当前模型上限");
+        return;
+      }
+      setReferenceVideoUrls((items) => [...items, url]);
+    } else {
+      if (referenceAudioUrls.length >= (selectedVideoModel?.maxReferenceAudios ?? 0)) {
+        setStatusTone("error");
+        setStatus("参考音频数量已达当前模型上限");
+        return;
+      }
+      setReferenceAudioUrls((items) => [...items, url]);
+    }
+
+    setReferenceUrl("");
+    setStatusTone("success");
+    setStatus("参考素材 URL 已添加");
   }
 
   async function run(event: FormEvent<HTMLFormElement>) {
@@ -680,6 +734,34 @@ export default function Home() {
                   <p className="field-note">
                     当前上限：图 {selectedVideoModel?.maxReferenceImages ?? 0}，视频 {selectedVideoModel?.maxReferenceVideos ?? 0}，音频 {selectedVideoModel?.maxReferenceAudios ?? 0}
                   </p>
+                  <div className="reference-url-row">
+                    <select
+                      value={referenceUrlType}
+                      onChange={(event) => setReferenceUrlType(event.target.value as ReferenceUrlType)}
+                      disabled={busy || uploading || !supportsReferences}
+                      aria-label="参考素材 URL 类型"
+                    >
+                      {(["image", "video", "audio"] as ReferenceUrlType[]).map((type) => (
+                        <option value={type} key={type}>
+                          {REFERENCE_TYPE_LABELS[type]}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={referenceUrl}
+                      onChange={(event) => setReferenceUrl(event.target.value)}
+                      placeholder="粘贴参考素材 URL"
+                      disabled={busy || uploading || !supportsReferences}
+                    />
+                    <button
+                      className="secondary"
+                      type="button"
+                      onClick={addReferenceUrl}
+                      disabled={busy || uploading || !supportsReferences || !referenceUrl.trim()}
+                    >
+                      添加
+                    </button>
+                  </div>
                   <div className="material-list">
                     {referenceImageUrls.map((url, index) => (
                       <button type="button" key={url} onClick={() => removeReference("image", index)}>
